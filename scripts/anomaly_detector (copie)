@@ -7,7 +7,6 @@ import roslib; roslib.load_manifest('anomaly_detector')
 import rospy
 from std_msgs.msg import String
 from anomaly_detector.msg import Joint
-from anomaly_detector.msg import IMU
 from anomaly_detector.msg import BodyPart
 import qi
 import time
@@ -57,33 +56,37 @@ class AnomalyDetector:
         BPart = BodyPart()
         self.n_sample = self.n_sample + 1
         print(self.n_sample)
-        for part in self.joints:
-            if part in ['Gyroscope','Angle','Accelerometer']:
-                X =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+part+"X/Sensor/Value")
-                Y =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+part+"Y/Sensor/Value")
-                Z =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+part+"Z/Sensor/Value")
-         
-                imu = IMU()
-                imu.x = round(X/100,6)
-                imu.y = round(Y/100,6)
-                imu.z = round(Z/100,6)
-                imu.name = part
-                imu.sample = str(self.n_sample)  	
-                BPart.IMUSensor.append(imu)
-                 
-            else:
-                PositionActuator =  self.memory.getData("Device/SubDeviceList/"+part+"/Position/Actuator/Value")
-                PositionSensor =  self.memory.getData("Device/SubDeviceList/"+part+"/Position/Sensor/Value")
-                Hardness =  self.memory.getData("Device/SubDeviceList/"+part+"/Hardness/Actuator/Value")
-	        
-                joint = Joint()       
-                joint.error_position = round(PositionActuator - PositionSensor,6)
-                joint.hardness = round(Hardness,6)
-                joint.name = part
-                joint.sample = str(self.n_sample)
-                BPart.JointSensor.append(joint)
+        for part in self.joints:                
+            PositionActuator =  self.memory.getData("Device/SubDeviceList/"+part+"/Position/Actuator/Value")
+            PositionSensor =  self.memory.getData("Device/SubDeviceList/"+part+"/Position/Sensor/Value")
+            joint = Joint()       
+            joint.commanded_position = float(PositionActuator)
+            joint.sensed_position = float(PositionSensor) 
+            joint.name = part
+            joint.sample = str(self.n_sample)
+            
+            BPart.BodyPart.append(joint)
+            #print(part)
+        
         self.pub_joint.publish(BPart)        
         return True 
+
+    def getDataIMU(self, sensor):
+        X =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+sensor+"X/Sensor/Value")
+        Y =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+sensor+"Y/Sensor/Value")
+        Z =  self.memory.getData("Device/SubDeviceList/InertialSensorBase/"+sensor+"Z/Sensor/Value")
+         
+        self.imu[sensor][0].append(round(X,6))
+        self.imu[sensor][1].append(round(Y,6))	
+        self.imu[sensor][2].append(round(Z,6))
+
+        #print "####################"
+        return True 
+
+    def save_txt(self, joint):
+
+        np.savetxt("txt/"+joint+".txt", np.transpose(self.joints[joint]), fmt='%f', delimiter='  ', newline='\n', header='', footer='', comments='# ', encoding=None)
+
 			
     def run(self):
         """
@@ -92,10 +95,7 @@ class AnomalyDetector:
         print "Starting Collecting Data (sensors)"
         try:
             joints = []
-            #IMU	
-            joints.append('Gyroscope')
-            joints.append('Angle')	
-            joints.append('Accelerometer')
+            sensors = []   	
             #Head
             joints.append('HeadPitch')   
             joints.append('HeadYaw')
@@ -104,22 +104,28 @@ class AnomalyDetector:
             joints.append('KneePitch')
             joints.append('LElbowRoll')
             joints.append('LElbowYaw')
+            joints.append('LHand')
             joints.append('LShoulderPitch')
             joints.append('LShoulderRoll')
-            joints.append('LWristYaw') 
             joints.append('RElbowRoll')
             joints.append('RElbowYaw')
+            joints.append('RHand')
             joints.append('RShoulderPitch')
             joints.append('RShoulderRoll')
-            joints.append('RWristYaw')     
 
             self.joints = joints
+            ''' 
+            #IMU	
+            sensors.append('Gyroscope')
+            sensors.append('Angle')	
+            sensors.append('Accelerometer')
+            '''
         	
            
             
             
             while True:
-                time.sleep(0.4) 
+                time.sleep(0.8) 
                 self.getData()
                 #for sensor in sensors:
                 #    self.getDataIMU(sensor)

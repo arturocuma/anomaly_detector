@@ -53,6 +53,8 @@ catkin_python_setup()
  add_message_files(
    FILES
    Joint.msg
+   IMU.msg
+   BodyPart.msg
  )
 
 generate_messages(
